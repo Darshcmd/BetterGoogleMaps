@@ -5,6 +5,7 @@
 <p align="center">
   <img src="logo.png" alt="BetterGoogleMaps Logo" width="400" />
 </p>
+
 ## Abstract
 
 Conventional navigation systems answer a *single-traveller* question: *what is
