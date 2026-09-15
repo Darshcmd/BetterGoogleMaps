@@ -20,9 +20,13 @@ frontend/.vite/
 
 # Data caches (rebuilt automatically from OSM)
 data/cache/
+data/graphs/*.graphml
 
 # OS
 .DS_Store
+
+# Experiment outputs (results/precomputed/*.json IS tracked — used by "Run preset")
+results/*.json
 
 # Logs
 *.log
