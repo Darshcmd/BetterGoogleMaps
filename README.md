@@ -463,17 +463,11 @@ patience 4, tolerance 1e-4.
 
 ---
 
-## References
-
-1. U.S. Bureau of Public Roads — *Traffic Assignment Manual* (BPR function, 1964)
-2. Sheffi, Y. — *Urban Transportation Networks* (MSA / traffic assignment, 1985)
-3. Yen, J.Y. — *Finding the K Shortest Loopless Paths in a Network*, Management Science (1971)
-4. Boeing, G. — *OSMnx: New Methods for Acquiring, Constructing, and Analyzing Road Networks*, arXiv:1611.01890
-5. OpenStreetMap (ODbL) · Nominatim · Leaflet · FastAPI · NetworkX
-
 ## Attribution
 
 Map data © OpenStreetMap contributors (ODbL). Geocoding by Nominatim.
 Built with FastAPI, OSMnx, NetworkX, Shapely, Leaflet. Independent
 implementation inspired by the GiggleMaps collective-routing concept.
+
+## MADE WITH LOVE BY DARSH SONI ❤️
 
