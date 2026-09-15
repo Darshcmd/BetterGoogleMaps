@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BetterGoogleMaps — Collective Traffic Routing</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#0e1116;--panel:#161b22;--line:#2b3340;--text:#e6edf3;--muted:#8b949e;--accent:#4ea1ff;--base:#f59e0b;--prop:#34d399}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+header{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:12px}
+header h1{font-size:16px;margin:0;letter-spacing:.5px}
+header .sub{color:var(--muted);font-size:11px}
+.wrap{display:grid;grid-template-columns:340px 1fr;height:calc(100vh - 41px)}
+#map{height:100%;min-height:400px;border:1px solid var(--line);background:#000}
+.panel{background:var(--panel);border-right:1px solid var(--line);padding:14px;overflow-y:auto}
+.panel label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:10px 0 3px}
+.panel input{width:100%;padding:7px 8px;background:#0b0e13;border:1px solid var(--line);color:var(--text);border-radius:0;font-family:inherit;font-size:12px}
+.panel button{width:100%;margin-top:12px;padding:9px;background:var(--accent);color:#04121f;border:0;border-radius:0;font-weight:700;cursor:pointer;font-family:inherit;font-size:12px}
+.panel button:disabled{opacity:.5;cursor:wait}
+.panel button.secondary{margin-top:6px;background:#0b0e13;color:var(--muted);border:1px solid var(--line)}
+.presets{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0}
+.presets button{width:auto;margin:0;padding:3px 7px;background:#0b0e13;color:var(--muted);border:1px solid var(--line);font-size:10px;cursor:pointer}
+.err{color:#f87171;font-size:11px;margin-top:8px;white-space:pre-wrap}
+.loading{margin-top:12px;padding:10px;background:#0b0e13;border:1px solid var(--line);border-radius:0;font-size:11px;display:none}
+.loading .spinner{display:inline-block;width:12px;height:12px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading .bar{height:4px;background:var(--line);border-radius:0;margin-top:6px;overflow:hidden}
+.loading .bar i{display:block;height:100%;background:var(--accent);transition:width .3s}
+.res{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+.res h2{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:0 0 8px}
+.metric{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px dashed #222b36}
+.metric span:first-child{color:var(--muted)}
+.metric span:last-child{font-weight:600}
+.routes{margin-top:10px}
+.route{padding:7px 8px;background:#0b0e13;border:1px solid var(--line);border-radius:0;margin-bottom:5px;font-size:11px;cursor:pointer}
+.route:hover{border-color:var(--accent)}
+.route.sel{border-color:#34d399;color:#e6f7f0}
+.route.dim{opacity:.25}
+.route b{color:var(--prop)}
+.route .flow{color:var(--accent);font-weight:600}
+.heat{display:inline-block;width:11px;height:3px;background:#39404d}
+.legend{position:absolute;bottom:12px;right:12px;background:rgba(11,14,19,.92);border:1px solid var(--line);border-radius:0;padding:8px 10px;font-size:10px;z-index:1000}
+.legend div{display:flex;align-items:center;gap:6px;margin:2px 0}
+.legend i{width:18px;height:3px;display:inline-block}
+</style>
+</head>
+<body>
+<header>
+  <img src="logo.png" alt="BetterGoogleMaps" width="22" height="22">
+  <h1>BetterGoogleMaps</h1>
+</header>
+<div class="wrap">
+  <div class="panel">
+    <label>Source</label>
+    <input id="source" value="VIT Chennai">
+    <div class="presets" id="srcPresets"></div>
+    <label>Destination</label>
+    <input id="dest" value="Chennai Central">
+    <div class="presets" id="dstPresets"></div>
+    <label>Number of people</label>
+    <input id="people" type="number" value="2000" min="1" max="100000">
+    <label>API endpoint</label>
+    <input id="api" value="http://localhost:8000">
+    <button id="runBtn">Run algorithm (real OSM map data)</button>
+    <button id="demoBtn" class="secondary">Demo (instant, synthetic graph)</button>
+    <button id="presetBtn" class="secondary" style="display:flex;align-items:center;gap:6px">
+      <img src="logo.png" alt="" width="14" height="14" style="margin:0">
+      Run preset
+    </button>
+    <button id="simBtn" class="secondary" style="display:none">&#9654; Play simulation</button>
+    <div class="loading" id="loadingBox">
+      <div class="spinner"></div>
+      <span id="loadMsg">Working...</span>
+      <div class="bar"><i id="loadBar" style="width:0%"></i></div>
+    </div>
+    <div class="err" id="errBox"></div>
+    <div class="res" id="resPanel" style="display:none">
+      <h2>Results</h2>
+      <div id="metrics"></div>
+      <div class="routes" id="routes"></div>
+      <div style="margin-top:12px;font-size:10px;color:var(--muted);border-top:1px solid var(--line);padding-top:8px" id="explanation"></div>
+    </div>
+  </div>
+  <div id="map"></div>
+</div>
+<div class="legend" id="legend" style="display:none"></div>
+
+ <div id="attribution" style="position:fixed;bottom:12px;left:12px;background:rgba(11,14,19,.92);border:1px solid var(--line);border-radius:0;padding:6px 10px;font-size:10px;color:var(--muted);z-index:1000">
+   Made by: DARSH SONI (24BRS1207)
+ </div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+"use strict";
+const S = { map:null, base:null, net:null, nodes:null, props:[], simRoutes:[], simMarkers:[], simActive:false, simAnim:null, selRoute:null,
+  srcPs:["VIT Chennai","Chennai Airport","Chennai Central","Guindy","Tidel Park"],
+  dstPs:["Chennai Central","Chennai Airport","VIT Chennai","Guindy","T. Nagar"],
+  colors:["#34d399","#a78bfa","#f472b6","#fbbf24","#60a5fa","#fb923c","#22d3ee","#f87171"] };
+const $ = (id) => document.getElementById(id);
+function showLoading(msg, pct){
+  $("loadingBox").style.display = "block";
+  $("loadMsg").textContent = msg || "Working...";
+  $("loadBar").style.width = (pct || 0) + "%";
+}
+function hideLoading(){ $("loadingBox").style.display = "none"; }
+function clearMap(){
+  if(S.simAnim){ cancelAnimationFrame(S.simAnim); S.simAnim = null; }
+  S.simActive = false; S.simRoutes = []; S.selRoute = null;
+  S.simMarkers.forEach(m => S.map.removeLayer(m)); S.simMarkers = [];
+  if(S.base){ S.map.removeLayer(S.base); S.base = null; }
+  if(S.net){ S.map.removeLayer(S.net); S.net = null; }
+  if(S.nodes){ S.map.removeLayer(S.nodes); S.nodes = null; }
+  S.props.forEach(l => S.map.removeLayer(l)); S.props = [];
+  $("simBtn").style.display = "none";
+  $("simBtn").textContent = "\u25B6 Play simulation";
+}
+function init(){
+  S.map = L.map("map").setView([13.02, 80.22], 12);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    { maxZoom:19, attribution:"&copy; OpenStreetMap" }).addTo(S.map);
+  S.srcPs.forEach(n => presetBtn("srcPresets", "source", n));
+  S.dstPs.forEach(n => presetBtn("dstPresets", "dest", n));
+  $("runBtn").onclick = runReal;
+  $("demoBtn").onclick = runDemo;
+  $("presetBtn").onclick = runPreset;
+  refreshPresets();
+}
+function presetBtn(containerId, inputId, name){
+  const b = document.createElement("button");
+  b.textContent = name; b.type = "button";
+  b.onclick = () => { $(inputId).value = name; };
+  $(containerId).appendChild(b);
+}
+function getInputs(){
+  const api = $("api").value.replace(/\/+$/, "");
+  const people = parseInt($("people").value, 10);
+  if(!(people >= 1 && people <= 100000)) throw new Error("People must be 1-100,000");
+  return { api: api, people: people };
+}
+function fail(msg){ $("errBox").textContent = "Error: " + msg; hideLoading(); }
+async function runReal(){
+  $("errBox").textContent = ""; $("resPanel").style.display = "none";
+  $("runBtn").disabled = true; $("demoBtn").disabled = true; clearMap();
+  try{
+    const inp = getInputs();
+    const src = $("source").value.trim(), dst = $("dest").value.trim();
+    if(!src || !dst) throw new Error("Enter source and destination");
+    showLoading("Starting job...", 3);
+    const r = await fetch(inp.api + "/api/run-async", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ origin: {name: src}, destination: {name: dst}, people: inp.people })
+    });
+    const job = await r.json();
+    if(!r.ok) throw new Error(job.detail || r.statusText);
+    const jid = job.job_id;
+    const deadline = Date.now() + 600000;   // 10 min
+    const t0 = Date.now();
+    while(true){
+      if(Date.now() > deadline) throw new Error("Timed out after 10 minutes");
+      await new Promise(res => setTimeout(res, 1500));
+      const jr = await fetch(inp.api + "/api/job/" + jid);
+      const jj = await jr.json();
+      if(!jr.ok) throw new Error(jj.detail || "job lost");
+      const secs = Math.round((Date.now() - t0) / 1000);
+      showLoading((jj.message || "Working...") + " (" + secs + "s elapsed)", jj.progress || 0);
+      if(jj.status === "done"){ render(jj.result); break; }
+      if(jj.status === "error") throw new Error(jj.message || "Job failed");
+    }
+  }catch(e){ fail(e.message); }
+  finally{ hideLoading(); $("runBtn").disabled = false; $("demoBtn").disabled = false; }
+}
+async function runDemo(){
+  $("errBox").textContent = ""; $("resPanel").style.display = "none";
+  $("runBtn").disabled = true; $("demoBtn").disabled = true; clearMap();
+  try{
+    const inp = getInputs();
+    showLoading("Running on synthetic demo graph...", 60);
+    const r = await fetch(inp.api + "/api/demo", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ origin: {name: "Demo Start"}, destination: {name: "Demo End"}, people: inp.people })
+    });
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.detail || r.statusText);
+    render(d);
+  }catch(e){ fail(e.message); }
+  finally{ hideLoading(); $("runBtn").disabled = false; $("demoBtn").disabled = false; }
+}
+
+// Presets panel
+let _presets = [];
+async function refreshPresets(){
+  try{
+    const api = $("api").value.replace(/\/+$/, "");
+    const r = await fetch(api + "/api/precomputed");
+    if(!r.ok){ _presets = []; return; }
+    const j = await r.json();
+    _presets = j.precomputed || [];
+  }catch(e){ _presets = []; }
+  const btn = $("presetBtn");
+  btn.style.display = _presets.length ? "" : "none";
+  btn.textContent = _presets.length ? "Run preset (instant)": "Run preset (instant)";
+}
+
+async function runPreset(){
+  $("errBox").textContent = ""; $("resPanel").style.display = "none";
+  $("runBtn").disabled = true; $("demoBtn").disabled = true; $("presetBtn").disabled = true;
+  clearMap();
+  if(_presets.length === 0){ fail("No presets cached"); return; }
+  const src = $("source").value.trim(), dst = $("dest").value.trim();
+  let pick = _presets[0];
+  for(const p of _presets){
+    if(p.src === src && p.dst === dst){ pick = p; break; }
+    if(p.improvement_pct > pick.improvement_pct) pick = p;
+  }
+  const api = $("api").value.replace(/\/+$/, "");
+  showLoading("Loading cached result... 100%", 100);
+  try{
+    const r = await fetch(api + "/api/precomputed/" + encodeURIComponent(pick.key));
+    if(!r.ok) throw new Error("not found");
+    const d = await r.json();
+    render(d);
+    $("source").value = pick.src;
+    $("dest").value = pick.dst;
+  }catch(e){ fail("Preset unavailable: " + pick.key); }
+  finally{ hideLoading(); $("runBtn").disabled = false; $("demoBtn").disabled = false; $("presetBtn").disabled = false; }
+}
+
+function render(d){
+  const ev = d.evaluation, m = ev.baseline, p = ev.proposed;
+  $("metrics").innerHTML =
+    '<div class="metric"><span>Graph</span><span>' + ev.nodes.toLocaleString() + ' nodes / ' + ev.edges.toLocaleString() + ' edges</span></div>' +
+    '<div class="metric"><span>Travellers</span><span>' + ev.people.toLocaleString() + '</span></div>' +
+    '<div class="metric"><span>Baseline ETA</span><span>' + m.congested_time_min.toFixed(2) + ' min (' + m.distance_km.toFixed(2) + ' km)</span></div>' +
+    '<div class="metric"><span>Collective avg ETA</span><span>' + p.avg_time_min.toFixed(2) + ' min</span></div>' +
+    '<div class="metric"><span>Person-time saved</span><span>' + ev.time_saved_min.toLocaleString() + ' min (' + ev.time_saved_hours.toLocaleString() + ' h)</span></div>' +
+    '<div class="metric"><span>Improvement</span><span><b style="color:#34d399">' + ev.improvement_pct.toFixed(2) + '%</b></span></div>' +
+    '<div class="metric"><span>Routes used</span><span>' + p.routes_used + '</span></div>' +
+    '<div class="metric"><span>Max road utilization</span><span>' + (p.max_utilization * 100).toFixed(0) + '%</span></div>' +
+    '<div class="metric"><span>Iterations</span><span>' + p.iterations + ' (' + p.convergence_reason + ')</span></div>' +
+    '<div class="metric"><span>Wall time</span><span>' + (d.wall_ms || 0).toFixed(0) + ' ms</span></div>';
+  const rc = $("routes"); rc.innerHTML = "";
+  const routeOrder = [];
+  p.routes.forEach(r => {
+    const div = document.createElement("div");
+    div.className = "route";
+    div.innerHTML = '<b>Route ' + r.id + '</b> &mdash; <span class="flow">' + r.flow.toLocaleString() + ' people (' + r.share_pct.toFixed(1) + '%)</span><br>' +
+      (r.distance_m / 1000).toFixed(2) + ' km | congested ' + r.congested_time_min.toFixed(2) + ' min/traveller';
+    div.onclick = () => highlightRoute(routeOrder.length);
+    routeOrder.push(r.id);
+    rc.appendChild(div);
+  });
+  S.routeIds = routeOrder;
+  const expl = $("explanation");
+  if(ev.improvement_pct > 1){
+    expl.textContent = "Why: sending all " + ev.people.toLocaleString() + " travellers down the shortest path pushes flow far above road capacity (BPR congestion up to " + (m.congested_time_min / m.free_time_min).toFixed(1) + "x free-flow). The optimizer shifted travellers onto parallel corridors so shared links stay under capacity — average ETA fell from " + m.congested_time_min.toFixed(1) + " to " + p.avg_time_min.toFixed(1) + " min/traveller, i.e. the same demand with " + ev.improvement_pct.toFixed(0) + "% less total delay.";
+  } else {
+    expl.textContent = "Why: " + ev.people.toLocaleString() + " travellers fit within free-flow capacity of the shortest route (no meaningful congestion), so the ordinary shortest path is already near-optimal. Increase the traveller count to see collective routing kick in.";
+  }
+  $("resPanel").style.display = "block";
+  drawMap(d);
+  setupSimulation(d);
+}
+function heatColor(u){
+  if(u <= 0.05) return "#4ea1ff";   // unused roads: thin blue
+  if(u < 0.50)  return "#34d399";   // light traffic: green
+  if(u < 0.80)  return "#fbbf24";   // moderate: amber
+  if(u < 1.00)  return "#fb923c";   // heavy: orange
+  return "#f87171";                 // over capacity: red
+}
+function clsWeight(hw){
+  if(hw === "motorway" || hw === "trunk") return 2.6;
+  if(hw === "primary" || hw === "secondary") return 1.8;
+  return 1.1;
+}
+function drawMap(d){
+  clearMap();
+  if(d.geojson && d.geojson.features){
+    const nodePts = [];
+    d.geojson.features.forEach(f => {
+      if(f.geometry && f.geometry.type === "LineString" && f.properties && f.properties.kind === "context"){
+        const cs = f.geometry.coordinates.map(c => [c[1], c[0]]);
+        S.net = (S.net || L.layerGroup());
+        const u = f.properties.util || 0;
+        L.polyline(cs, {
+          color: heatColor(u),
+          weight: clsWeight(f.properties.highway),
+          opacity: u > 0.05 ? Math.min(0.95, 0.4 + u * 0.3) : 0.22
+        }).addTo(S.net);
+      } else if(f.geometry && f.geometry.type === "Point" && f.properties && f.properties.kind === "node"){
+        nodePts.push([f.geometry.coordinates[1], f.geometry.coordinates[0]]);
+      }
+    });
+    if(S.net){ S.net.addTo(S.map); }
+    if(nodePts.length){
+      S.nodes = L.layerGroup(nodePts.map(p =>
+        L.circleMarker(p, { radius:2, color:"#8b949e", weight:1, opacity:0.7, fillOpacity:0.5 })));
+      S.nodes.addTo(S.map);
+    }
+  }
+  if(d.origin && d.destination){
+    L.circleMarker([d.origin.lat, d.origin.lon],
+      { radius:7, color:"#34d399", fillColor:"#34d399", fillOpacity:0.9, weight:2 })
+      .bindTooltip("Origin").addTo(S.map).openTooltip();
+    L.circleMarker([d.destination.lat, d.destination.lon],
+      { radius:7, color:"#f87171", fillColor:"#f87171", fillOpacity:0.9, weight:2 })
+      .bindTooltip("Destination").addTo(S.map).openTooltip();
+  }
+  if(d.route_coords && d.route_coords.baseline){
+    S.base = L.polyline(d.route_coords.baseline.map(c => [c[1], c[0]]),
+      { color:"#f59e0b", weight:3, opacity:0.65, dashArray:"6,6" }).addTo(S.map);
+  }
+  const share = {};
+  (d.evaluation && d.evaluation.proposed.routes || []).forEach(r => { share["route_" + r.id] = r.share_pct; });
+  // Prefer road-following geometry from geojson route features when present.
+  const roadGeom = {};
+  if(d.geojson && d.geojson.features){
+    d.geojson.features.forEach(f => {
+      if(f.geometry && f.geometry.type === "LineString" && f.properties && f.properties.kind === "route" && f.properties.name){
+        roadGeom[f.properties.name] = f.geometry.coordinates.map(c => [c[1], c[0]]);
+      }
+    });
+  }
+  let ci = 0;
+  Object.keys(d.route_coords || {}).forEach(k => {
+    if(k === "baseline") return;
+    const cs = roadGeom[k] || d.route_coords[k].map(c => [c[1], c[0]]);
+    if(cs.length > 1){
+      const pct = share[k] || 0;
+      const col = S.colors[ci % S.colors.length];
+      const wgt = 3 + Math.min(9, 9 * pct / 40);
+      const line = L.polyline(cs, { color: col, weight: wgt, opacity: 0.95 }).addTo(S.map);
+      line._flw = { color: col, weight: wgt, opacity: 0.95 };
+      S.props.push(line);
+      ci++;
+    }
+  });
+  let all = [];
+  Object.values(d.route_coords || {}).forEach(cs => { all = all.concat(cs); });
+  if(all.length){
+    const b = L.latLngBounds(all.map(c => L.latLng(c[1], c[0])));
+    S.map.fitBounds(b, { padding: [50, 50] });
+  }
+  const lg = $("legend");
+  lg.style.display = "block";
+  lg.innerHTML = '<div style="font-weight:700;margin-bottom:4px">Legend</div>' +
+    '<div style="font-size:10px;color:var(--muted)">Road load (flow/capacity):</div>' +
+    '<div><i class="heat" style="background:#4ea1ff"></i> Free &nbsp;<i class="heat" style="background:#34d399"></i> Light</div>' +
+    '<div><i class="heat" style="background:#fbbf24"></i> Moderate &nbsp;<i class="heat" style="background:#fb923c"></i> Heavy</div>' +
+    '<div><i class="heat" style="background:#f87171"></i> Over capacity</div>' +
+    '<div style="margin-top:2px"><i style="background:#f59e0b;border-top:1px dashed #f59e0b;height:0"></i> Baseline (shortest)</div>' +
+    '<div><span style="color:#34d399;font-size:11px">&#9679;</span> Origin &nbsp;<span style="color:#f87171;font-size:11px">&#9679;</span> Destination</div>';
+  let li = 0;
+  Object.keys(d.route_coords || {}).forEach(k => {
+    if(k === "baseline") return;
+    const pct = share[k] || 0;
+    const div = document.createElement("div");
+    div.innerHTML = '<i style="background:' + S.colors[li % S.colors.length] + ';height:' +
+      (3 + Math.min(9, 9 * pct / 40)) + 'px"></i> Route ' + (++li) + ' &mdash; ' + pct.toFixed(0) + '% of travellers';
+    lg.appendChild(div);
+  });
+}
+function setupSimulation(d){
+  S.simRoutes = [];
+  const share = {};
+  (d.evaluation.proposed.routes || []).forEach(r => { share["route_" + r.id] = r.share_pct; });
+  let ci = 0;
+  Object.keys(d.route_coords || {}).forEach(k => {
+    if(k === "baseline") return;
+    const cs = d.route_coords[k].map(c => [c[1], c[0]]);
+    if(cs.length > 1){
+      S.simRoutes.push({ coords: cs, color: S.colors[ci % S.colors.length], share: share[k] || 0 });
+      ci++;
+    }
+  });
+  const sb = $("simBtn");
+  if(S.simRoutes.length){ sb.style.display = "block"; sb.onclick = toggleSim; }
+  else { sb.style.display = "none"; }
+}
+function toggleSim(){ if(S.simActive){ stopSim(); } else { startSim(); } }
+function startSim(){
+  if(!S.simRoutes.length) return;
+  S.simActive = true;
+  $("simBtn").textContent = "\u23F8  Pause";
+  S.simMarkers.forEach(m => S.map.removeLayer(m)); S.simMarkers = [];
+  const dots = [];
+  let total = 0;
+  S.simRoutes.forEach((r, ri) => {
+    let n = Math.max(2, Math.round(r.share / 8));
+    if(total + n > 36) n = Math.max(1, 36 - total);
+    for(let i = 0; i < n; i++) dots.push({ ri: ri, off: i / n });
+    total += n;
+  });
+  S.simDots = dots.map(dd => {
+    const mk = L.circleMarker([0, 0], { radius: 3.4, color: "#ffffff", weight: 1,
+      fillColor: S.simRoutes[dd.ri].color, fillOpacity: 1, opacity: 0.92 });
+    mk.addTo(S.map);
+    S.simMarkers.push(mk);
+    const cs = S.simRoutes[dd.ri].coords;
+    return { mk: mk, coords: cs, off: dd.off, len: cs.length - 1 };
+  });
+  S.simT0 = (performance && performance.now) ? performance.now() : Date.now();
+  if(S.simAnim) cancelAnimationFrame(S.simAnim);
+  simTick();
+}
+function simTick(){
+  const now = (performance && performance.now) ? performance.now() : Date.now();
+  const lap = 9000;
+  const t = ((now - S.simT0) % lap) / lap;
+  S.simDots.forEach(dd => {
+    const p = (t + dd.off) % 1;
+    const idx = p * dd.len;
+    const i0 = Math.floor(idx);
+    const i1 = Math.min(i0 + 1, dd.len);
+    const f = idx - i0;
+    const c0 = dd.coords[i0], c1 = dd.coords[i1];
+    dd.mk.setLatLng([c0[0] + (c1[0] - c0[0]) * f, c0[1] + (c1[1] - c0[1]) * f]);
+  });
+  if(S.simActive) S.simAnim = requestAnimationFrame(simTick);
+}
+function stopSim(){
+  S.simActive = false;
+  if(S.simAnim){ cancelAnimationFrame(S.simAnim); S.simAnim = null; }
+  $("simBtn").textContent = "\u25B6  Play";
+  S.simMarkers.forEach(m => S.map.removeLayer(m)); S.simMarkers = [];
+}
+function highlightRoute(i){
+  if(S.selRoute === i){ S.selRoute = null; resetHighlights(); return; }
+  S.selRoute = i;
+  const cards = Array.from(document.querySelectorAll(".route"));
+  cards.forEach((c, j) => {
+    c.classList.remove("sel", "dim");
+    if(j !== i){ c.classList.add("dim"); } else { c.classList.add("sel"); }
+  });
+  S.props.forEach((l, j) => {
+    const base = l._flw || { color: S.colors[j % S.colors.length], weight: 4, opacity: 0.95 };
+    if(l.setStyle){ l.setStyle({ color: base.color, weight: j === i ? 6 : 2,
+                                opacity: j === i ? 1 : 0.12 }); }
+  });
+}
+function resetHighlights(){
+  Array.from(document.querySelectorAll(".route")).forEach(c => c.classList.remove("sel", "dim"));
+  S.props.forEach(l => {
+    const base = l._flw || { color: "#34d399", weight: 4, opacity: 0.95 };
+    if(l.setStyle){ l.setStyle(base); }
+  });
+}
+window.addEventListener("load", init);
+</script>
+</body>
+</html>

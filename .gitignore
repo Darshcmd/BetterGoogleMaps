@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+frontend/build/
+frontend/.svelte-kit/
+frontend/.vite/
+
+# Environment / secrets
+.env
+.env.local
+*.pem
+
+# Data caches (rebuilt automatically from OSM)
+data/cache/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
