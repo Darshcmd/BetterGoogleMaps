@@ -1,12 +1,10 @@
 # BetterGoogleMaps - A Better Approach to Navigate Traffic
 
-*Running on the FlowTwin engine** · FastAPI + OSMnx + NetworkX + Leaflet
+**Running on the FlowTwin engine** · FastAPI + OSMnx + NetworkX + Leaflet
 <br>
 <p align="center">
-  ![image.png](logo.png)
+  <img src="logo.png" alt="BetterGoogleMaps Logo" width="400" />
 </p>
-
-
 ## Abstract
 
 Conventional navigation systems answer a *single-traveller* question: *what is
