@@ -11,6 +11,32 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_DIR = PROJECT_ROOT / "backend"
+
+
+def _load_dotenv() -> None:
+    """Minimal .env loader (dependency-free).
+
+    Reads PROJECT_ROOT/.env and sets any not-yet-set variables so the
+    FLOWTWIN_* knobs below can be configured without shell exports.
+    Existing environment variables always win.
+    """
+    env_file = PROJECT_ROOT / ".env"
+    if not env_file.exists():
+        return
+    try:
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            os.environ.setdefault(key.strip(), value.strip().strip("'\""))
+    except OSError:
+        pass
+
+
+_load_dotenv()
+
+
 DATA_DIR = Path(os.environ.get("FLOWTWIN_DATA_DIR", PROJECT_ROOT / "data"))
 GRAPH_DIR = DATA_DIR / "graphs"
 GEOCODE_CACHE_DIR = DATA_DIR / "cache" / "geocode"
