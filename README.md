@@ -1,8 +1,10 @@
-# BetterGoogleMaps — Collective Traffic Routing on Real Road Networks
+# BetterGoogleMaps - A Better Approach to Navigate Traffic
 
 *Running on the FlowTwin engine** · FastAPI + OSMnx + NetworkX + Leaflet
 <br>
-![image.png](logo.png)
+<p align="center">
+  ![image.png](logo.png)
+</p>
 
 
 ## Abstract
