@@ -117,14 +117,16 @@ function clearMap(){
 }
 function init(){
   S.map = L.map("map").setView([13.02, 80.22], 12);
-  // CARTO basemap (OSM data, CC-BY, permissive tile policy for light use).
-  // OpenStreetMap's own tile server 403-blocks file:// pages / bulk loads.
-  const base = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-    { maxZoom:20, subdomains:"abcd",
-      attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>' }).addTo(S.map);
+  // Esri dark-gray basemap (free, no API key, no watermark).
+  // OSM's own tile server 403-blocks file:// pages / bulk loads, and CARTO now
+  // stamps "API KEY REQUIRED" watermarks on its anonymous tiles, so we use Esri's
+  // Canvas World Dark Gray Base (LODs 0-23) + matching Reference label overlay.
+  const base = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+    { maxZoom:20,
+      attribution:'&copy; <a href="https://www.esri.com/">Esri</a>, DeLorme, NAVTEQ, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(S.map);
   // Street labels on top of route overlays.
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png",
-    { maxZoom:20, subdomains:"abcd", opacity:0.9, pane:"shadowPane" }).addTo(S.map);
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+    { maxZoom:20, opacity:0.9, pane:"shadowPane" }).addTo(S.map);
   base.on("tileerror", () => { /* network issue: routes still render */ });
 
   S.srcPs.forEach(n => presetBtn("srcPresets", "source", n));
