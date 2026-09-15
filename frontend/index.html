@@ -13,11 +13,7 @@ header{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;align-
 header h1{font-size:16px;margin:0;letter-spacing:.5px}
 header .sub{color:var(--muted);font-size:11px}
 .wrap{display:grid;grid-template-columns:340px 1fr;height:calc(100vh - 41px)}
-#map{height:100%;min-height:400px;border:1px solid var(--line);background:#000}
-/* Esri dark-gray tiles are mid gray; darken them toward the near-black CARTO
-   dark_all palette the heat-map colors were designed against, so road-load
-   colors stay visible. Only the base pane is filtered, not the label overlay. */
-.leaflet-tile-pane .leaflet-tile{filter:brightness(.5) contrast(1.15)}
+#map{height:100%;min-height:400px;border:1px solid var(--line);background:#e8e4d8}
 .panel{background:var(--panel);border-right:1px solid var(--line);padding:14px;overflow-y:auto}
 .panel label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:10px 0 3px}
 .panel input{width:100%;padding:7px 8px;background:#0b0e13;border:1px solid var(--line);color:var(--text);border-radius:0;font-family:inherit;font-size:12px}
@@ -48,6 +44,8 @@ header .sub{color:var(--muted);font-size:11px}
 .legend{position:absolute;bottom:12px;right:12px;background:rgba(11,14,19,.92);border:1px solid var(--line);border-radius:0;padding:8px 10px;font-size:10px;z-index:1000}
 .legend div{display:flex;align-items:center;gap:6px;margin:2px 0}
 .legend i{width:18px;height:3px;display:inline-block}
+.apihint{display:none;margin-top:8px;padding:8px;border:1px solid #f59e0b;background:rgba(245,158,11,.08);color:#fbbf24;font-size:10px;line-height:1.5}
+.apihint b{color:#f59e0b}
 </style>
 </head>
 <body>
@@ -67,6 +65,7 @@ header .sub{color:var(--muted);font-size:11px}
     <input id="people" type="number" value="2000" min="1" max="100000">
     <label>API endpoint</label>
     <input id="api" value="http://localhost:8000">
+    <div class="apihint" id="apiHint"><b>Backend offline.</b> GitHub Pages only hosts this UI &mdash; the routing engine runs locally. Start it with <b>uvicorn backend.main:app --port 8000</b>, keep the endpoint above at http://localhost:8000 (or point it at any deployed backend URL), then reload.</div>
     <button id="runBtn">Run algorithm (real OSM map data)</button>
     <button id="demoBtn" class="secondary">Demo (instant, synthetic graph)</button>
     <button id="presetBtn" class="secondary" style="display:flex;align-items:center;gap:6px">
@@ -121,16 +120,14 @@ function clearMap(){
 }
 function init(){
   S.map = L.map("map").setView([13.02, 80.22], 12);
-  // Esri dark-gray basemap (free, no API key, no watermark).
-  // OSM's own tile server 403-blocks file:// pages / bulk loads, and CARTO now
-  // stamps "API KEY REQUIRED" watermarks on its anonymous tiles, so we use Esri's
-  // Canvas World Dark Gray Base (LODs 0-23) + matching Reference label overlay.
-  const base = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-    { maxZoom:20,
+  // Esri World Street Map: a genuinely COLORFUL basemap (tan terrain, green
+  // forest, blue water, white roads) with labels baked in — no API key, no
+  // watermark. (OSM's own tiles hard-block this app with a 403 notice, and
+  // CARTO stamps "API KEY REQUIRED" watermarks on its anonymous tiles, which
+  // is why the map looked black-and-white with dark_all / Dark Gray Canvas.)
+  const base = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+    { maxNativeZoom:19, maxZoom:20,
       attribution:'&copy; <a href="https://www.esri.com/">Esri</a>, DeLorme, NAVTEQ, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(S.map);
-  // Street labels on top of route overlays.
-  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
-    { maxZoom:20, opacity:0.9, pane:"shadowPane" }).addTo(S.map);
   base.on("tileerror", () => { /* network issue: routes still render */ });
 
   S.srcPs.forEach(n => presetBtn("srcPresets", "source", n));
@@ -138,6 +135,7 @@ function init(){
   $("runBtn").onclick = runReal;
   $("demoBtn").onclick = runDemo;
   $("presetBtn").onclick = runPreset;
+  $("api").addEventListener("change", refreshPresets);
   refreshPresets();
 }
 function presetBtn(containerId, inputId, name){
@@ -204,16 +202,16 @@ async function runDemo(){
 // Presets panel
 let _presets = [];
 async function refreshPresets(){
+  let ok = false;
   try{
     const api = $("api").value.replace(/\/+$/, "");
     const r = await fetch(api + "/api/precomputed");
-    if(!r.ok){ _presets = []; return; }
-    const j = await r.json();
-    _presets = j.precomputed || [];
+    if(r.ok){ const j = await r.json(); _presets = j.precomputed || []; ok = true; }
+    else { _presets = []; }
   }catch(e){ _presets = []; }
+  $("apiHint").style.display = ok ? "none" : "block";
   const btn = $("presetBtn");
   btn.style.display = _presets.length ? "" : "none";
-  btn.textContent = _presets.length ? "Run preset (instant)": "Run preset (instant)";
 }
 
 async function runPreset(){
@@ -283,9 +281,9 @@ function heatColor(u){
   return "#f87171";                 // over capacity: red
 }
 function clsWeight(hw){
-  if(hw === "motorway" || hw === "trunk") return 2.6;
-  if(hw === "primary" || hw === "secondary") return 1.8;
-  return 1.1;
+  if(hw === "motorway" || hw === "trunk") return 3.0;
+  if(hw === "primary" || hw === "secondary") return 2.2;
+  return 1.4;
 }
 function drawMap(d){
   clearMap();
@@ -299,7 +297,9 @@ function drawMap(d){
         L.polyline(cs, {
           color: heatColor(u),
           weight: clsWeight(f.properties.highway),
-          opacity: u > 0.05 ? Math.min(0.95, 0.4 + u * 0.3) : 0.3
+          // Light basemap: raise opacities so the load colors still read
+          // (thin 0.3-opacity lines vanish against the beige street tiles).
+          opacity: u > 0.05 ? Math.min(0.95, 0.6 + u * 0.3) : 0.55
         }).addTo(S.net);
       } else if(f.geometry && f.geometry.type === "Point" && f.properties && f.properties.kind === "node"){
         nodePts.push([f.geometry.coordinates[1], f.geometry.coordinates[0]]);
