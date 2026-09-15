@@ -14,6 +14,10 @@ header h1{font-size:16px;margin:0;letter-spacing:.5px}
 header .sub{color:var(--muted);font-size:11px}
 .wrap{display:grid;grid-template-columns:340px 1fr;height:calc(100vh - 41px)}
 #map{height:100%;min-height:400px;border:1px solid var(--line);background:#000}
+/* Esri dark-gray tiles are mid gray; darken them toward the near-black CARTO
+   dark_all palette the heat-map colors were designed against, so road-load
+   colors stay visible. Only the base pane is filtered, not the label overlay. */
+.leaflet-tile-pane .leaflet-tile{filter:brightness(.5) contrast(1.15)}
 .panel{background:var(--panel);border-right:1px solid var(--line);padding:14px;overflow-y:auto}
 .panel label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:10px 0 3px}
 .panel input{width:100%;padding:7px 8px;background:#0b0e13;border:1px solid var(--line);color:var(--text);border-radius:0;font-family:inherit;font-size:12px}
@@ -295,7 +299,7 @@ function drawMap(d){
         L.polyline(cs, {
           color: heatColor(u),
           weight: clsWeight(f.properties.highway),
-          opacity: u > 0.05 ? Math.min(0.95, 0.4 + u * 0.3) : 0.22
+          opacity: u > 0.05 ? Math.min(0.95, 0.4 + u * 0.3) : 0.3
         }).addTo(S.net);
       } else if(f.geometry && f.geometry.type === "Point" && f.properties && f.properties.kind === "node"){
         nodePts.push([f.geometry.coordinates[1], f.geometry.coordinates[0]]);
